@@ -14,8 +14,8 @@ cursor = conn.cursor()
 # ----------------------------
 # 3. Create the Table
 # ----------------------------
-# Define the table schema for expenses
-# Columns: id (PK), item, category, amount, date
+# Generates the expenses table
+# This table stores: item name, category, amount, and date
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS expenses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,25 +38,32 @@ def add_expense(item, category, amount, date=None):
     if not item:
         raise ValueError("item is required")
     try:
+        # Converts to number
         amount = float(amount)
 
+        # If date is not specified then it will use default time stamp
         if date is None:
             cursor.execute(
                 "INSERT INTO expenses (item, category, amount) VALUES (?, ?, ?)",
                 (item, category, amount),
             )
         else:
+            # Formates date properly
             if isinstance(date, datetime):
                 date_str = date.strftime("%Y-%m-%d %H:%M:%S")
             else:
                 date_str = str(date)
+
+            # Insert expense w/ date
             cursor.execute(
                 "INSERT INTO expenses (item, category, amount, date) VALUES (?, ?, ?, ?)",
                 (item, category, amount, date_str),
             )
 
         conn.commit()
+
         return cursor.lastrowid
+    
     except sqlite3.Error as e:
         conn.rollback()
         raise
@@ -72,14 +79,18 @@ def view_expenses():
             print("No expenses found.")
             return rows
         
+        # Print formatted expense table
         print("\n" + "="*80)
         print(f"{'ID':<5} {'Item':<20} {'Category':<15} {'Amount':<12} {'Date':<20}")
         print("="*80)
+
         for row in rows:
             expense_id, item, category, amount, date = row
             print(f"{expense_id:<5} {item:<20} {category or 'N/A':<15} ${amount:<11.2f} {date:<20}")
+
         print("="*80 + "\n")
         return rows
+    
     except sqlite3.Error as e:
         print(f"Error retrieving expenses: {e}")
         raise
@@ -89,40 +100,52 @@ def update_expense(expense_id, item=None, category=None, amount=None, date=None)
     Update an existing expense.
     """
     try:
-        # Build dynamic UPDATE query
+        # Store update fields
         updates = []
         params = []
 
+        # Add fields if provided
         if item is not None:
             updates.append("item = ?")
             params.append(item)
+
         if category is not None:
             updates.append("category = ?")
             params.append(category)
+
         if amount is not None:
             updates.append("amount = ?")
             params.append(float(amount))
+
         if date is not None:
             if isinstance(date, datetime):
                 date_str = date.strftime("%Y-%m-%d %H:%M:%S")
             else:
                 date_str = str(date)
+
             updates.append("date = ?")
             params.append(date_str)
 
+        # Ensures there is an update
         if not updates:
             raise ValueError("At least one field must be provided to update")
 
+        # Add expense ID
         params.append(expense_id)
+
         query = f"UPDATE expenses SET {', '.join(updates)} WHERE id = ?"
         cursor.execute(query, params)
+
         conn.commit()
 
+        # Confirm update result
         if cursor.rowcount == 0:
             print(f"No expense found with ID {expense_id}")
         else:
             print(f"Expense {expense_id} updated successfully.")
+
         return cursor.rowcount
+    
     except sqlite3.Error as e:
         conn.rollback()
         print(f"Error updating expense: {e}")
@@ -140,7 +163,9 @@ def delete_expense(expense_id):
             print(f"No expense found with ID {expense_id}")
         else:
             print(f"Expense {expense_id} deleted successfully.")
+
         return cursor.rowcount
+    
     except sqlite3.Error as e:
         conn.rollback()
         print(f"Error deleting expense: {e}")
@@ -168,6 +193,7 @@ def summary():
         print("="*50 + "\n")
 
         return {"total": total or 0, "average": average or 0, "count": count or 0}
+    
     except sqlite3.Error as e:
         print(f"Error calculating summary: {e}")
         raise
@@ -190,6 +216,7 @@ def filter_by_month(year, month):
             "SELECT id, item, category, amount, date FROM expenses WHERE date >= ? AND date < ? ORDER BY date",
             (start_date, end_date)
         )
+
         rows = cursor.fetchall()
 
         if not rows:
@@ -201,6 +228,7 @@ def filter_by_month(year, month):
         print("="*80)
         print(f"{'ID':<5} {'Item':<20} {'Category':<15} {'Amount':<12} {'Date':<20}")
         print("="*80)
+
         for row in rows:
             expense_id, item, category, amount, date = row
             print(f"{expense_id:<5} {item:<20} {category or 'N/A':<15} ${amount:<11.2f} {date:<20}")
@@ -212,6 +240,7 @@ def filter_by_month(year, month):
         print("="*80 + "\n")
 
         return rows
+    
     except sqlite3.Error as e:
         print(f"Error filtering expenses by month: {e}")
         raise
@@ -223,7 +252,7 @@ if __name__ == "__main__":
     print("Expense Tracker Application")
     print("=" * 50)
 
-    # Example: Add some expenses
+    # Add sample expenses
     print("\n--- Adding Expenses ---")
     add_expense("Candy", "Snacks", 5.50)
     add_expense("Gas", "Transportation", 50.00)
